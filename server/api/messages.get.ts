@@ -1,0 +1,7 @@
+import { useDb } from '../utils/db'
+import { requireAdmin } from '../utils/auth'
+
+export default defineEventHandler((event) => {
+  requireAdmin(event)
+  return useDb().prepare('SELECT * FROM messages ORDER BY id DESC').all()
+})
