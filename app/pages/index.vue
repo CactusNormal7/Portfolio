@@ -1,36 +1,38 @@
 <script setup lang="ts">
 interface Project {
-  id: number
-  title: string
-  description: string
-  tags: string[]
-  year: string
-  link: string
-  image: string
+  id: number;
+  title: string;
+  description: string;
+  tags: string[];
+  year: string;
+  link: string;
+  image: string;
 }
 
-const { data: projects } = await useFetch<Project[]>('/api/projects')
+const { data: projects } = await useFetch<Project[]>("/api/projects");
 
-const form = reactive({ name: '', email: '', message: '' })
-const formState = ref<'idle' | 'sending' | 'sent' | 'error'>('idle')
-const formError = ref('')
+const form = reactive({ name: "", email: "", message: "" });
+const formState = ref<"idle" | "sending" | "sent" | "error">("idle");
+const formError = ref("");
 
-async function submitContact () {
-  formState.value = 'sending'
-  formError.value = ''
+async function submitContact() {
+  formState.value = "sending";
+  formError.value = "";
   try {
-    await $fetch('/api/contact', { method: 'POST', body: { ...form } })
-    formState.value = 'sent'
-    form.name = ''
-    form.email = ''
-    form.message = ''
+    await $fetch("/api/contact", { method: "POST", body: { ...form } });
+    formState.value = "sent";
+    form.name = "";
+    form.email = "";
+    form.message = "";
   } catch (err: unknown) {
-    formState.value = 'error'
-    formError.value = (err as { statusMessage?: string })?.statusMessage ?? 'Something went wrong. Try again.'
+    formState.value = "error";
+    formError.value =
+      (err as { statusMessage?: string })?.statusMessage ??
+      "Something went wrong. Try again.";
   }
 }
 
-const year = new Date().getFullYear()
+const year = new Date().getFullYear();
 </script>
 
 <template>
@@ -55,14 +57,25 @@ const year = new Date().getFullYear()
         <span>Portfolio — {{ year }}</span>
       </p>
       <h1 class="hero__title">
-        <span class="mask-line" style="--mask-delay: 0.2s"><span>JULES</span></span>
-        <span class="mask-line mask-line--outline" style="--mask-delay: 0.35s"><span>BESSON</span></span>
+        <span class="mask-line" style="--mask-delay: 0.2s"
+          ><span>JULES</span></span
+        >
+        <span class="mask-line mask-line--outline" style="--mask-delay: 0.35s"
+          ><span>BESSON</span></span
+        >
       </h1>
       <div class="hero__bottom">
         <p class="hero__sub mask-line" style="--mask-delay: 0.55s">
-          <span>Web developer & M1 student.<br>I build sharp, fast, minimal interfaces.</span>
+          <span
+            >Web developer & M1 student.<br />I build sharp, fast, minimal
+            interfaces.</span
+          >
         </p>
-        <a href="#work" class="hero__scroll mono mask-line" style="--mask-delay: 0.7s">
+        <a
+          href="#work"
+          class="hero__scroll mono mask-line"
+          style="--mask-delay: 0.7s"
+        >
           <span>Scroll ↓</span>
         </a>
       </div>
@@ -107,7 +120,7 @@ const year = new Date().getFullYear()
           </div>
           <div class="about__meta-row">
             <span class="mono">Stack</span>
-            <span>Vue / Nuxt / Node / SQL / TypeScript</span>
+            <span>Vue / Nuxt / React / Node / SQL / TypeScript...</span>
           </div>
           <div class="about__meta-row">
             <span class="mono">Looking for</span>
@@ -126,7 +139,11 @@ const year = new Date().getFullYear()
       </div>
 
       <ul class="work__list">
-        <li v-for="(project, i) in projects" :key="project.id" v-reveal="i * 80">
+        <li
+          v-for="(project, i) in projects"
+          :key="project.id"
+          v-reveal="i * 80"
+        >
           <component
             :is="project.link ? 'a' : 'div'"
             :href="project.link || undefined"
@@ -134,12 +151,16 @@ const year = new Date().getFullYear()
             :rel="project.link ? 'noopener' : undefined"
             class="project"
           >
-            <span class="project__index mono">{{ String(i + 1).padStart(2, '0') }}</span>
+            <span class="project__index mono">{{
+              String(i + 1).padStart(2, "0")
+            }}</span>
             <div class="project__main">
               <h3 class="project__title">{{ project.title }}</h3>
               <p class="project__desc">{{ project.description }}</p>
               <ul class="project__tags" aria-label="Technologies">
-                <li v-for="tag in project.tags" :key="tag" class="mono">{{ tag }}</li>
+                <li v-for="tag in project.tags" :key="tag" class="mono">
+                  {{ tag }}
+                </li>
               </ul>
             </div>
             <span class="project__year mono">{{ project.year }}</span>
@@ -157,42 +178,105 @@ const year = new Date().getFullYear()
       </div>
 
       <h2 class="contact__title" v-reveal>
-        Let's build<br><span class="outline">something.</span>
+        Let's build<br /><span class="outline">something.</span>
       </h2>
 
       <div class="contact__grid">
-        <form class="contact__form" v-reveal @submit.prevent="submitContact">
-          <div class="field">
-            <label for="c-name">Name</label>
-            <input id="c-name" v-model="form.name" type="text" required autocomplete="name">
+        <div class="contact__form-zone" v-reveal>
+          <form
+            v-if="formState !== 'sent'"
+            class="contact__form"
+            @submit.prevent="submitContact"
+          >
+            <div class="field">
+              <label for="c-name">Name</label>
+              <input
+                id="c-name"
+                v-model="form.name"
+                type="text"
+                required
+                autocomplete="name"
+              />
+            </div>
+            <div class="field">
+              <label for="c-email">Email</label>
+              <input
+                id="c-email"
+                v-model="form.email"
+                type="email"
+                required
+                autocomplete="email"
+              />
+            </div>
+            <div class="field">
+              <label for="c-message">Message</label>
+              <textarea id="c-message" v-model="form.message" required />
+            </div>
+            <button
+              class="btn"
+              type="submit"
+              :disabled="formState === 'sending'"
+            >
+              <span>{{
+                formState === "sending" ? "Sending" : "Send message"
+              }}</span>
+              <span
+                class="btn__arrow"
+                :class="{ 'btn__arrow--sending': formState === 'sending' }"
+                aria-hidden="true"
+                >→</span
+              >
+            </button>
+            <p
+              v-if="formState === 'error'"
+              class="contact__feedback contact__feedback--error mono"
+            >
+              {{ formError }}
+            </p>
+          </form>
+
+          <div v-else class="contact__sent" role="status">
+            <span class="contact__sent-check" aria-hidden="true">✓</span>
+            <p class="contact__sent-title">Message<br />sent.</p>
+            <p class="contact__sent-sub mono">
+              Thanks — I'll get back to you soon.
+            </p>
+            <button
+              type="button"
+              class="contact__sent-again mono"
+              @click="formState = 'idle'"
+            >
+              Send another →
+            </button>
           </div>
-          <div class="field">
-            <label for="c-email">Email</label>
-            <input id="c-email" v-model="form.email" type="email" required autocomplete="email">
-          </div>
-          <div class="field">
-            <label for="c-message">Message</label>
-            <textarea id="c-message" v-model="form.message" required />
-          </div>
-          <button class="btn" type="submit" :disabled="formState === 'sending'">
-            {{ formState === 'sending' ? 'Sending…' : 'Send message' }} →
-          </button>
-          <p v-if="formState === 'sent'" class="contact__feedback mono">Message sent. I'll get back to you soon.</p>
-          <p v-if="formState === 'error'" class="contact__feedback contact__feedback--error mono">{{ formError }}</p>
-        </form>
+        </div>
 
         <aside class="contact__aside" v-reveal="150">
           <div class="about__meta-row">
             <span class="mono">Email</span>
-            <a class="contact__link" href="mailto:jules.besson74@gmail.com">jules.besson74@gmail.com</a>
+            <a class="contact__link" href="mailto:jules.besson74@gmail.com"
+              >jules.besson74@gmail.com</a
+            >
           </div>
           <div class="about__meta-row">
             <span class="mono">GitHub</span>
-            <a class="contact__link" href="https://github.com/CactusNormal7" target="_blank" rel="noopener">github.com/CactusNormal7</a>
+            <a
+              class="contact__link"
+              href="https://github.com/CactusNormal7"
+              target="_blank"
+              rel="noopener"
+              >github.com/CactusNormal7</a
+            >
           </div>
           <div class="about__meta-row">
             <span class="mono">LinkedIn</span>
-            <a class="contact__link" href="https://linkedin.com" target="_blank" rel="noopener">/in/julesbesson</a>
+            <a
+              class="contact__link"
+              href="https://linkedin.com"
+              target="_blank"
+              rel="noopener"
+              >/in/julesbesson</a
+            >
           </div>
         </aside>
       </div>
@@ -202,7 +286,13 @@ const year = new Date().getFullYear()
     <footer class="footer">
       <span class="mono">© {{ year }} Jules Besson</span>
       <span class="mono">Designed &amp; built with too much coffee</span>
-      <a href="https://thomaskauffmant.com/home" target="_blank" rel="noopener" class="mono">Reference — thomaskauffmant.com ↗</a>
+      <a
+        href="https://thomaskauffmant.com/home"
+        target="_blank"
+        rel="noopener"
+        class="mono"
+        >Reference — thomaskauffmant.com ↗</a
+      >
       <a href="#top" class="mono">Back to top ↑</a>
     </footer>
   </main>
@@ -244,7 +334,7 @@ const year = new Date().getFullYear()
 }
 
 .header__nav a::after {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   bottom: 0;
@@ -358,7 +448,10 @@ const year = new Date().getFullYear()
   font-style: normal;
   background: var(--ink);
   color: var(--bg);
-  padding: 0 0.35em;
+  padding: 0 0.08em;
+  /* repeat the padding on each line fragment when the highlight wraps */
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }
 
 .about__meta {
@@ -392,7 +485,9 @@ const year = new Date().getFullYear()
   gap: 1.5rem;
   padding: clamp(1.75rem, 4vh, 3rem) var(--gutter);
   border-top: 1px solid var(--line-soft);
-  transition: background 0.35s var(--ease-out), color 0.35s var(--ease-out);
+  transition:
+    background 0.35s var(--ease-out),
+    color 0.35s var(--ease-out);
 }
 
 .work__list li:first-child .project {
@@ -433,7 +528,9 @@ const year = new Date().getFullYear()
   border: 1px solid var(--line-soft);
   padding: 0.3rem 0.7rem;
   color: var(--grey-dark);
-  transition: border-color 0.35s, color 0.35s;
+  transition:
+    border-color 0.35s,
+    color 0.35s;
 }
 
 .project__arrow {
@@ -441,7 +538,9 @@ const year = new Date().getFullYear()
   padding-top: 0.2rem;
   transform: translate(-6px, 6px);
   opacity: 0;
-  transition: transform 0.35s var(--ease-out), opacity 0.35s var(--ease-out);
+  transition:
+    transform 0.35s var(--ease-out),
+    opacity 0.35s var(--ease-out);
 }
 
 .project:hover {
@@ -501,12 +600,123 @@ const year = new Date().getFullYear()
   width: 100%;
 }
 
-.contact__feedback {
-  color: var(--grey-dark);
-}
-
 .contact__feedback--error {
   color: #b00020;
+}
+
+/* ---- send animation ---- */
+
+.btn__arrow {
+  display: inline-block;
+  transition: transform 0.3s var(--ease-out);
+}
+
+.contact__form .btn:hover .btn__arrow {
+  transform: translateX(5px);
+}
+
+@keyframes arrow-fly {
+  0% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  45% {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+  55% {
+    transform: translateX(-12px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.btn__arrow--sending {
+  animation: arrow-fly 0.9s var(--ease-out) infinite;
+}
+
+@keyframes sent-wipe {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@keyframes sent-item {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+
+.contact__sent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1.25rem;
+  padding: clamp(2rem, 5vw, 3.5rem);
+  background: var(--ink);
+  color: var(--bg);
+  transform-origin: top;
+  animation: sent-wipe 0.55s var(--ease-out);
+}
+
+.contact__sent > * {
+  animation: sent-item 0.6s var(--ease-out) both;
+}
+
+.contact__sent > *:nth-child(1) {
+  animation-delay: 0.3s;
+}
+.contact__sent > *:nth-child(2) {
+  animation-delay: 0.4s;
+}
+.contact__sent > *:nth-child(3) {
+  animation-delay: 0.5s;
+}
+.contact__sent > *:nth-child(4) {
+  animation-delay: 0.6s;
+}
+
+.contact__sent-check {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+.contact__sent-title {
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  line-height: 0.95;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+}
+
+.contact__sent-sub {
+  color: var(--grey);
+}
+
+.contact__sent-again {
+  margin-top: 0.5rem;
+  padding: 0.8rem 1.4rem;
+  border: 1px solid var(--bg);
+  transition:
+    background 0.25s var(--ease-out),
+    color 0.25s var(--ease-out);
+}
+
+.contact__sent-again:hover {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn__arrow--sending,
+  .contact__sent,
+  .contact__sent > * {
+    animation: none;
+  }
 }
 
 .contact__aside {

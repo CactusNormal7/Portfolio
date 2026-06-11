@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    .bg { fill: #f4f4f2; }
+    .fg { fill: #0e0e0e; }
+    @media (prefers-color-scheme: dark) {
+      .bg { fill: #0e0e0e; }
+      .fg { fill: #f4f4f2; }
+    }
+    text {
+      font-family: 'Space Grotesk', ui-sans-serif, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+      font-weight: 700;
+    }
+  </style>
+  <rect class="bg" width="64" height="64"/>
+  <text class="fg" x="8" y="48" font-size="36" letter-spacing="-2">JB</text>
+  <text class="fg" x="46" y="28" font-size="15">®</text>
+</svg>

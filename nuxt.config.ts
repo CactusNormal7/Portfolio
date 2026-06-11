@@ -32,6 +32,12 @@ export default defineNuxtConfig({
         { name: 'description', content: 'Jules Besson — M1 web development student. Selected works, about & contact.' }
       ],
       htmlAttrs: { lang: 'en' },
+      link: [
+        // SVG favicon follows the system color scheme; PNG is the fallback
+        { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' },
+        { rel: 'icon', type: 'image/png', sizes: '64x64', href: '/favicon.png' },
+        { rel: 'apple-touch-icon', href: '/favicon.png' }
+      ],
       script: [
         {
           // Apply the saved (or system) theme before first paint to avoid a flash
