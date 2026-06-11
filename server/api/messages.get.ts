@@ -1,7 +1,7 @@
-import { useDb } from '../utils/db'
+import { usePrisma } from '../utils/prisma'
 import { requireAdmin } from '../utils/auth'
 
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
   requireAdmin(event)
-  return useDb().prepare('SELECT * FROM messages ORDER BY id DESC').all()
+  return usePrisma().message.findMany({ orderBy: { id: 'desc' } })
 })

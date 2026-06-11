@@ -1,4 +1,4 @@
-import { useDb } from '../utils/db'
+import { usePrisma } from '../utils/prisma'
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event)
@@ -13,9 +13,6 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Invalid email address' })
   }
 
-  useDb()
-    .prepare('INSERT INTO messages (name, email, body) VALUES (?, ?, ?)')
-    .run(name, email, message)
-
+  await usePrisma().message.create({ data: { name, email, body: message } })
   return { ok: true }
 })

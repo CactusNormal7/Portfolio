@@ -1,4 +1,5 @@
-import { useDb } from '../../utils/db'
+import { Prisma } from '@prisma/client'
+import { usePrisma } from '../../utils/prisma'
 import { requireAdmin } from '../../utils/auth'
 
 export default defineEventHandler(async (event) => {
@@ -10,26 +11,24 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Title is required' })
   }
 
-  const db = useDb()
-  const result = db
-    .prepare(
-      `UPDATE projects
-       SET title = ?, description = ?, tags = ?, year = ?, link = ?, image = ?, position = ?
-       WHERE id = ?`
-    )
-    .run(
-      String(body.title).trim(),
-      String(body.description ?? ''),
-      String(body.tags ?? ''),
-      String(body.year ?? ''),
-      String(body.link ?? ''),
-      String(body.image ?? ''),
-      Number(body.position ?? 0),
-      id
-    )
-
-  if (result.changes === 0) {
-    throw createError({ statusCode: 404, statusMessage: 'Project not found' })
+  try {
+    await usePrisma().project.update({
+      where: { id },
+      data: {
+        title: String(body.title).trim(),
+        description: String(body.description ?? ''),
+        tags: String(body.tags ?? ''),
+        year: String(body.year ?? ''),
+        link: String(body.link ?? ''),
+        image: String(body.image ?? ''),
+        position: Number(body.position ?? 0)
+      }
+    })
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      throw createError({ statusCode: 404, statusMessage: 'Project not found' })
+    }
+    throw err
   }
   return { ok: true }
 })

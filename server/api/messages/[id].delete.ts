@@ -1,14 +1,18 @@
-import { useDb } from '../../utils/db'
+import { Prisma } from '@prisma/client'
+import { usePrisma } from '../../utils/prisma'
 import { requireAdmin } from '../../utils/auth'
 
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
   requireAdmin(event)
 
   const id = Number(getRouterParam(event, 'id'))
-  const result = useDb().prepare('DELETE FROM messages WHERE id = ?').run(id)
-
-  if (result.changes === 0) {
-    throw createError({ statusCode: 404, statusMessage: 'Message not found' })
+  try {
+    await usePrisma().message.delete({ where: { id } })
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      throw createError({ statusCode: 404, statusMessage: 'Message not found' })
+    }
+    throw err
   }
   return { ok: true }
 })

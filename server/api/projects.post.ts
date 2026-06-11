@@ -1,4 +1,4 @@
-import { useDb } from '../utils/db'
+import { usePrisma } from '../utils/prisma'
 import { requireAdmin } from '../utils/auth'
 
 export default defineEventHandler(async (event) => {
@@ -9,21 +9,18 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Title is required' })
   }
 
-  const db = useDb()
-  const result = db
-    .prepare(
-      `INSERT INTO projects (title, description, tags, year, link, image, position)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    )
-    .run(
-      String(body.title).trim(),
-      String(body.description ?? ''),
-      String(body.tags ?? ''),
-      String(body.year ?? ''),
-      String(body.link ?? ''),
-      String(body.image ?? ''),
-      Number(body.position ?? 0)
-    )
+  const project = await usePrisma().project.create({
+    data: {
+      title: String(body.title).trim(),
+      description: String(body.description ?? ''),
+      tags: String(body.tags ?? ''),
+      year: String(body.year ?? ''),
+      link: String(body.link ?? ''),
+      image: String(body.image ?? ''),
+      position: Number(body.position ?? 0)
+    },
+    select: { id: true }
+  })
 
-  return { id: Number(result.lastInsertRowid) }
+  return { id: project.id }
 })

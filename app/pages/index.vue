@@ -43,7 +43,10 @@ const year = new Date().getFullYear()
         <a href="#work">Work</a>
         <a href="#contact">Contact</a>
       </nav>
-      <span class="header__meta mono">M1 — Web Dev</span>
+      <div class="header__right">
+        <span class="header__meta mono">M1 — Web Dev</span>
+        <ThemeToggle />
+      </div>
     </header>
 
     <!-- ============ HERO ============ -->
@@ -256,6 +259,12 @@ const year = new Date().getFullYear()
 .header__nav a:hover::after {
   transform: scaleX(1);
   transform-origin: left;
+}
+
+.header__right {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
 }
 
 .header__meta {

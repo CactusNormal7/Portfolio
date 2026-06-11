@@ -143,7 +143,10 @@ async function deleteMessage (message: Message) {
             Inbox ({{ messages?.length ?? 0 }})
           </button>
         </nav>
-        <button class="btn btn--ghost" @click="logout">Log out</button>
+        <div class="admin__actions">
+          <ThemeToggle />
+          <button class="btn btn--ghost" @click="logout">Log out</button>
+        </div>
       </header>
 
       <!-- ---------- PROJECTS TAB ---------- -->
@@ -315,6 +318,12 @@ async function deleteMessage (message: Message) {
 .admin__tabs button.active {
   background: var(--ink);
   color: var(--bg);
+}
+
+.admin__actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 /* ---------- body ---------- */
