@@ -12,7 +12,7 @@ interface Project {
 definePageMeta({ pageTransition: { name: "page", mode: "out-in" } });
 
 const description =
-  "Jules Besson — M1 web development student. Selected works, about & contact.";
+  "Jules Besson — M2 web development student. Selected works, about & contact.";
 useSeoMeta({
   description,
   ogTitle: "Jules Besson — Web Developer",
@@ -170,7 +170,10 @@ const year = new Date().getFullYear();
 
     <!-- ============ HEADER ============ -->
     <header class="header">
-      <a href="#top" class="header__logo" aria-label="Jules Besson — back to top"
+      <a
+        href="#top"
+        class="header__logo"
+        aria-label="Jules Besson — back to top"
         >JB<sup>®</sup></a
       >
       <nav class="header__nav mono" aria-label="Main">
@@ -185,7 +188,7 @@ const year = new Date().getFullYear();
         <NuxtLink to="/life">Life</NuxtLink>
       </nav>
       <div class="header__right">
-        <span class="header__meta mono">M1 — Web Dev</span>
+        <span class="header__meta mono">M2 — Web Dev</span>
         <ThemeToggle />
       </div>
     </header>
@@ -203,17 +206,15 @@ const year = new Date().getFullYear();
           <span class="mask-line" style="--mask-delay: 0.2s"
             ><span>JULES</span></span
           >
-          <span
-            class="mask-line mask-line--outline"
-            style="--mask-delay: 0.35s"
+          <span class="mask-line mask-line--outline" style="--mask-delay: 0.35s"
             ><span>BESSON</span></span
           >
         </h1>
         <div class="hero__bottom">
           <p class="hero__sub mask-line" style="--mask-delay: 0.55s">
             <span
-              >Web developer &amp; M1 student.<br >I build sharp, fast,
-              minimal interfaces.</span
+              >Web developer &amp; M2 student.<br />I build sharp, fast, minimal
+              interfaces.</span
             >
           </p>
           <div class="hero__ctas mask-line" style="--mask-delay: 0.7s">
@@ -263,7 +264,7 @@ const year = new Date().getFullYear();
             </div>
             <div class="about__meta-row">
               <dt class="mono">Currently</dt>
-              <dd>M1 Web Development</dd>
+              <dd>M2 Web Development</dd>
             </div>
             <div class="about__meta-row">
               <dt class="mono">Stack</dt>
@@ -337,7 +338,7 @@ const year = new Date().getFullYear();
                   :alt="`${project.title} — preview`"
                   loading="lazy"
                   decoding="async"
-                >
+                />
               </div>
               <span class="project__year mono">{{ project.year }}</span>
               <span
@@ -390,7 +391,7 @@ const year = new Date().getFullYear();
                 class="preview__img"
                 :class="{ 'is-active': hoveredProject === project.id }"
                 decoding="async"
-              >
+              />
             </template>
           </div>
         </div>
@@ -404,7 +405,7 @@ const year = new Date().getFullYear();
         </div>
 
         <p v-reveal class="contact__title" aria-hidden="true">
-          Let's build<br ><span class="outline">something.</span>
+          Let's build<br /><span class="outline">something.</span>
         </p>
 
         <div class="contact__grid">
@@ -425,7 +426,7 @@ const year = new Date().getFullYear();
                   required
                   maxlength="100"
                   autocomplete="name"
-                >
+                />
               </div>
               <div class="field">
                 <label for="c-email">Email</label>
@@ -438,7 +439,7 @@ const year = new Date().getFullYear();
                   autocomplete="email"
                   inputmode="email"
                   spellcheck="false"
-                >
+                />
               </div>
               <div class="field">
                 <label for="c-message">Message</label>
@@ -462,7 +463,7 @@ const year = new Date().getFullYear();
                   type="text"
                   tabindex="-1"
                   autocomplete="off"
-                >
+                />
               </div>
               <button
                 class="btn"
@@ -496,7 +497,7 @@ const year = new Date().getFullYear();
               tabindex="-1"
             >
               <span class="contact__sent-check" aria-hidden="true">✓</span>
-              <p class="contact__sent-title">Message<br >sent.</p>
+              <p class="contact__sent-title">Message<br />sent.</p>
               <p class="contact__sent-sub mono">
                 Thanks — I'll get back to you soon.
               </p>

@@ -29,7 +29,7 @@ export default defineNuxtConfig({
     head: {
       title: 'Jules Besson — Web Developer',
       meta: [
-        { name: 'description', content: 'Jules Besson — M1 web development student. Selected works, about & contact.' }
+        { name: 'description', content: 'Jules Besson — M2 web development student. Selected works, about & contact.' }
       ],
       htmlAttrs: { lang: 'en' },
       link: [
