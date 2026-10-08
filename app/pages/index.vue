@@ -21,8 +21,13 @@ useSeoMeta({
   twitterCard: "summary",
 });
 
-const { data: projects, error: projectsError } =
-  await useFetch<Project[]>("/api/projects");
+// lazy: still rendered server-side on first load, but client-side navigation
+// back to this page doesn't wait for the API (skeleton rows show meanwhile)
+const {
+  data: projects,
+  error: projectsError,
+  status: projectsStatus,
+} = useFetch<Project[]>("/api/projects", { lazy: true });
 
 /* ---------- contact form ---------- */
 const MESSAGE_MAX = 5000;
@@ -133,14 +138,22 @@ onMounted(() => {
     if (el) sectionObserver.observe(el);
   }
 
+  startPreviewLoop();
+});
+
+// projects may arrive after mount (lazy fetch), so start the loop when they do
+watch(hasImages, startPreviewLoop);
+
+function startPreviewLoop() {
   if (
+    !rafId &&
     hasImages.value &&
     matchMedia("(hover: hover) and (pointer: fine)").matches &&
     !matchMedia("(prefers-reduced-motion: reduce)").matches
   ) {
     rafId = requestAnimationFrame(animatePreview);
   }
-});
+}
 
 onBeforeUnmount(() => {
   sectionObserver?.disconnect();
@@ -334,6 +347,21 @@ const year = new Date().getFullYear();
                 >↗</span
               >
             </component>
+          </li>
+        </ul>
+
+        <ul
+          v-else-if="projectsStatus === 'pending'"
+          class="work__list"
+          aria-busy="true"
+          aria-label="Loading projects"
+        >
+          <li v-for="n in 3" :key="n" class="project project--skeleton">
+            <span class="skeleton skeleton--index" />
+            <div class="project__main">
+              <span class="skeleton skeleton--title" />
+              <span class="skeleton skeleton--text" />
+            </div>
           </li>
         </ul>
 
@@ -831,6 +859,60 @@ main:focus {
 
 .project:focus-visible {
   outline-offset: -4px;
+}
+
+/* ---- loading skeleton ---- */
+.project--skeleton {
+  cursor: default;
+}
+
+.project--skeleton:hover {
+  background: none;
+  color: inherit;
+}
+
+.skeleton {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    var(--bg-soft) 0%,
+    var(--line-soft) 50%,
+    var(--bg-soft) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton--index {
+  width: 1.5rem;
+  height: 0.8rem;
+  margin-top: 0.6rem;
+}
+
+.skeleton--title {
+  width: min(22rem, 70%);
+  height: clamp(1.6rem, 3.4vw, 3rem);
+}
+
+.skeleton--text {
+  width: min(36rem, 90%);
+  height: 1rem;
+  margin-top: 0.9rem;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
 }
 
 .work__empty {
