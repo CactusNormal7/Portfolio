@@ -11,8 +11,9 @@ function toggle () {
 </script>
 
 <template>
-  <button type="button" class="theme-toggle" aria-label="Toggle dark mode" @click="toggle">
-    <span class="theme-toggle__to-dark">Dark ●</span>
-    <span class="theme-toggle__to-light">Light ○</span>
+  <button type="button" class="theme-toggle" @click="toggle">
+    <span class="visually-hidden">Switch to </span>
+    <span class="theme-toggle__to-dark">Dark<span class="visually-hidden"> mode</span><span aria-hidden="true"> ●</span></span>
+    <span class="theme-toggle__to-light">Light<span class="visually-hidden"> mode</span><span aria-hidden="true"> ○</span></span>
   </button>
 </template>

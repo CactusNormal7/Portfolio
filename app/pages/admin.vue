@@ -15,10 +15,23 @@ interface Message {
   name: string
   email: string
   body: string
-  created_at: string
+  createdAt: string
 }
 
-useHead({ title: 'Backoffice — Jules Besson' })
+useHead({
+  title: 'Backoffice — Jules Besson',
+  meta: [{ name: 'robots', content: 'noindex, nofollow' }]
+})
+
+function errorMessage (err: unknown, fallback: string): string {
+  return (err as { statusMessage?: string })?.statusMessage ?? fallback
+}
+
+const dateFormat = new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short' })
+function formatDate (iso: string): string {
+  const date = new Date(iso)
+  return Number.isNaN(date.getTime()) ? '' : dateFormat.format(date)
+}
 
 const { data: session, refresh: refreshSession } = await useFetch('/api/auth/me')
 const authenticated = computed(() => session.value?.authenticated ?? false)
@@ -26,20 +39,29 @@ const authenticated = computed(() => session.value?.authenticated ?? false)
 /* ---------- login ---------- */
 const password = ref('')
 const loginError = ref('')
+const loggingIn = ref(false)
 
 async function login () {
+  if (loggingIn.value) return
   loginError.value = ''
+  loggingIn.value = true
   try {
     await $fetch('/api/auth/login', { method: 'POST', body: { password: password.value } })
     password.value = ''
     await Promise.all([refreshSession(), refreshProjects(), refreshMessages()])
-  } catch {
-    loginError.value = 'Wrong password.'
+  } catch (err: unknown) {
+    loginError.value = (err as { statusCode?: number })?.statusCode === 401
+      ? 'Wrong password.'
+      : 'Login failed — try again.'
+  } finally {
+    loggingIn.value = false
   }
 }
 
 async function logout () {
   await $fetch('/api/auth/logout', { method: 'POST' })
+  messages.value = []
+  resetForm()
   await refreshSession()
 }
 
@@ -53,6 +75,13 @@ const { data: messages, refresh: refreshMessages } = await useFetch<Message[]>('
 })
 
 const tab = ref<'projects' | 'messages'>('projects')
+const actionError = ref('')
+
+function openTab (name: 'projects' | 'messages') {
+  tab.value = name
+  actionError.value = ''
+  if (name === 'messages') refreshMessages()
+}
 
 /* ---------- project form ---------- */
 const emptyForm = { title: '', description: '', tags: '', year: '', link: '', image: '', position: 0 }
@@ -72,6 +101,8 @@ function startEdit (project: Project) {
   form.position = project.position
   formMessage.value = ''
   window.scrollTo({ top: 0, behavior: 'smooth' })
+  // focus without scrolling so the smooth scroll isn't interrupted
+  document.getElementById('p-title')?.focus({ preventScroll: true })
 }
 
 function resetForm () {
@@ -94,23 +125,33 @@ async function saveProject () {
     resetForm()
     await refreshProjects()
   } catch (err: unknown) {
-    formMessage.value = (err as { statusMessage?: string })?.statusMessage ?? 'Save failed.'
+    formMessage.value = errorMessage(err, 'Save failed.')
   } finally {
     saving.value = false
   }
 }
 
 async function deleteProject (project: Project) {
-  if (!window.confirm(`Delete “${project.title}”?`)) return
-  await $fetch(`/api/projects/${project.id}`, { method: 'DELETE' })
-  if (editingId.value === project.id) resetForm()
-  await refreshProjects()
+  if (!window.confirm(`Delete “${project.title}”? This can't be undone.`)) return
+  actionError.value = ''
+  try {
+    await $fetch(`/api/projects/${project.id}`, { method: 'DELETE' })
+    if (editingId.value === project.id) resetForm()
+    await refreshProjects()
+  } catch (err: unknown) {
+    actionError.value = errorMessage(err, 'Delete failed.')
+  }
 }
 
 async function deleteMessage (message: Message) {
-  if (!window.confirm(`Delete message from ${message.name}?`)) return
-  await $fetch(`/api/messages/${message.id}`, { method: 'DELETE' })
-  await refreshMessages()
+  if (!window.confirm(`Delete message from ${message.name}? This can't be undone.`)) return
+  actionError.value = ''
+  try {
+    await $fetch(`/api/messages/${message.id}`, { method: 'DELETE' })
+    await refreshMessages()
+  } catch (err: unknown) {
+    actionError.value = errorMessage(err, 'Delete failed.')
+  }
 }
 </script>
 
@@ -123,10 +164,10 @@ async function deleteMessage (message: Message) {
         <h1 class="login__title">Restricted<br>area.</h1>
         <div class="field">
           <label for="password">Password</label>
-          <input id="password" v-model="password" type="password" required autofocus>
+          <input id="password" v-model="password" type="password" required autofocus autocomplete="current-password">
         </div>
-        <button class="btn" type="submit">Enter →</button>
-        <p v-if="loginError" class="mono login__error">{{ loginError }}</p>
+        <button class="btn" type="submit" :disabled="loggingIn">{{ loggingIn ? 'Checking…' : 'Enter →' }}</button>
+        <p v-if="loginError" class="mono login__error" role="alert">{{ loginError }}</p>
         <NuxtLink to="/" class="mono login__back">← Back to site</NuxtLink>
       </form>
     </div>
@@ -135,19 +176,21 @@ async function deleteMessage (message: Message) {
     <template v-else>
       <header class="admin__header">
         <NuxtLink to="/" class="admin__logo">JB<sup>®</sup> <span class="mono">/ Backoffice</span></NuxtLink>
-        <nav class="admin__tabs mono">
-          <button :class="{ active: tab === 'projects' }" @click="tab = 'projects'">
+        <nav class="admin__tabs mono" aria-label="Sections">
+          <button type="button" :class="{ active: tab === 'projects' }" :aria-current="tab === 'projects' ? 'page' : undefined" @click="openTab('projects')">
             Projects ({{ projects?.length ?? 0 }})
           </button>
-          <button :class="{ active: tab === 'messages' }" @click="tab = 'messages'; refreshMessages()">
+          <button type="button" :class="{ active: tab === 'messages' }" :aria-current="tab === 'messages' ? 'page' : undefined" @click="openTab('messages')">
             Inbox ({{ messages?.length ?? 0 }})
           </button>
         </nav>
         <div class="admin__actions">
           <ThemeToggle />
-          <button class="btn btn--ghost" @click="logout">Log out</button>
+          <button type="button" class="btn btn--ghost" @click="logout">Log out</button>
         </div>
       </header>
+
+      <p v-if="actionError" class="admin__error mono" role="alert">{{ actionError }}</p>
 
       <!-- ---------- PROJECTS TAB ---------- -->
       <section v-if="tab === 'projects'" class="admin__body">
@@ -188,20 +231,22 @@ async function deleteMessage (message: Message) {
               {{ saving ? 'Saving…' : editingId ? 'Update project' : 'Add project' }}
             </button>
             <button v-if="editingId" class="btn btn--ghost" type="button" @click="resetForm">Cancel</button>
-            <span v-if="formMessage" class="mono panel__feedback">{{ formMessage }}</span>
+            <span v-if="formMessage" class="mono panel__feedback" role="status">{{ formMessage }}</span>
           </div>
         </form>
 
-        <ul class="rows">
+        <p v-if="!projects?.length" class="empty mono">No projects yet — add your first one above.</p>
+        <ul v-else class="rows">
           <li v-for="project in projects" :key="project.id" class="row">
             <span class="row__index mono">#{{ project.id }}</span>
+            <img v-if="project.image" :src="project.image" alt="" class="row__thumb" loading="lazy">
             <div class="row__main">
               <strong class="row__title">{{ project.title }}</strong>
-              <span class="mono row__sub">{{ project.year }} — {{ project.tags.join(', ') || 'no tags' }}</span>
+              <span class="mono row__sub">{{ project.year || 'no year' }} — {{ project.tags.join(', ') || 'no tags' }} — pos. {{ project.position }}</span>
             </div>
             <div class="row__actions">
-              <button class="mono row__btn" @click="startEdit(project)">Edit</button>
-              <button class="mono row__btn row__btn--danger" @click="deleteProject(project)">Delete</button>
+              <button type="button" class="mono row__btn" :aria-label="`Edit ${project.title}`" @click="startEdit(project)">Edit</button>
+              <button type="button" class="mono row__btn row__btn--danger" :aria-label="`Delete ${project.title}`" @click="deleteProject(project)">Delete</button>
             </div>
           </li>
         </ul>
@@ -210,17 +255,18 @@ async function deleteMessage (message: Message) {
       <!-- ---------- MESSAGES TAB ---------- -->
       <section v-else class="admin__body">
         <p v-if="!messages?.length" class="empty mono">Inbox is empty.</p>
-        <ul class="rows">
+        <ul v-else class="rows">
           <li v-for="message in messages" :key="message.id" class="row row--message">
             <span class="row__index mono">#{{ message.id }}</span>
             <div class="row__main">
               <strong class="row__title">{{ message.name }}</strong>
               <a class="mono row__sub" :href="`mailto:${message.email}`">{{ message.email }}</a>
               <p class="row__body">{{ message.body }}</p>
-              <span class="mono row__date">{{ message.created_at }} UTC</span>
+              <time class="mono row__date" :datetime="message.createdAt">{{ formatDate(message.createdAt) }}</time>
             </div>
             <div class="row__actions">
-              <button class="mono row__btn row__btn--danger" @click="deleteMessage(message)">Delete</button>
+              <a class="mono row__btn" :href="`mailto:${message.email}`">Reply</a>
+              <button type="button" class="mono row__btn row__btn--danger" :aria-label="`Delete message from ${message.name}`" @click="deleteMessage(message)">Delete</button>
             </div>
           </li>
         </ul>
@@ -265,7 +311,15 @@ async function deleteMessage (message: Message) {
 }
 
 .login__error {
-  color: #b00020;
+  color: var(--danger);
+}
+
+.admin__error {
+  margin: 1.5rem var(--gutter) 0;
+  padding: 0.9rem 1.2rem;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  max-width: 70rem;
 }
 
 .login__back {
@@ -432,7 +486,10 @@ async function deleteMessage (message: Message) {
 .row__btn {
   padding: 0.4rem 0.8rem;
   border: 1px solid var(--line-soft);
-  transition: all 0.2s;
+  transition:
+    background 0.2s,
+    border-color 0.2s,
+    color 0.2s;
 }
 
 .row__btn:hover {
@@ -442,8 +499,16 @@ async function deleteMessage (message: Message) {
 }
 
 .row__btn--danger:hover {
-  background: #b00020;
-  border-color: #b00020;
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--bg);
+}
+
+.row__thumb {
+  width: 4.5rem;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border: 1px solid var(--line-soft);
 }
 
 .empty {

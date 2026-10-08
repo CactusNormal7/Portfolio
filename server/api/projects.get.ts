@@ -1,9 +1,9 @@
-import { usePrisma } from '../utils/prisma'
+import { usePrisma, handleDbError } from '../utils/prisma'
 
 export default defineEventHandler(async () => {
   const projects = await usePrisma().project.findMany({
     orderBy: [{ position: 'asc' }, { id: 'desc' }]
-  })
+  }).catch(handleDbError)
 
   return projects.map(project => ({
     ...project,

@@ -1,76 +1,36 @@
-# Nuxt Minimal Starter
+# Portfolio — Jules Besson
 
-Look at the [Nuxt documentation](https://nuxt.com/docs/getting-started/introduction) to learn more.
+Personal portfolio built with Nuxt 4, Prisma and Supabase Postgres.
+Projects and contact messages live in the database and are managed from a password-protected backoffice at `/admin`.
 
 ## Setup
 
-Make sure to install dependencies:
-
 ```bash
-# npm
 npm install
-
-# pnpm
-pnpm install
-
-# yarn
-yarn install
-
-# bun
-bun install
+cp .env.example .env   # then fill in the values
 ```
 
-## Development Server
+`.env` needs:
 
-Start the development server on `http://localhost:3000`:
+- `DATABASE_URL` / `DIRECT_URL` — from Supabase Dashboard → Connect → ORMs → Prisma
+- `NUXT_ADMIN_PASSWORD` — backoffice password (defaults to `admin` if unset — always set it in production)
+
+Create the tables and seed the projects:
 
 ```bash
-# npm
-npm run dev
+npx prisma migrate deploy
+node --env-file=.env prisma/seed.mjs
+```
 
-# pnpm
-pnpm dev
+## Development
 
-# yarn
-yarn dev
-
-# bun
-bun run dev
+```bash
+npm run dev       # http://localhost:3000
 ```
 
 ## Production
 
-Build the application for production:
-
 ```bash
-# npm
 npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
+node --env-file=.env .output/server/index.mjs
 ```
-
-Locally preview production build:
-
-```bash
-# npm
-npm run preview
-
-# pnpm
-pnpm preview
-
-# yarn
-yarn preview
-
-# bun
-bun run preview
-```
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
-# Portfolio

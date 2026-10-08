@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
 
 let prisma: PrismaClient | null = null
 
@@ -13,4 +13,14 @@ export function usePrisma (): PrismaClient {
     prisma = new PrismaClient()
   }
   return prisma
+}
+
+// Turns "can't reach the database" into a clean 503 with a one-line log
+// instead of a full stack trace on every request. Other errors are rethrown.
+export function handleDbError (err: unknown): never {
+  if (err instanceof Prisma.PrismaClientInitializationError) {
+    console.error(`[db] Database unreachable: ${err.message.trim().split('\n').pop()}`)
+    throw createError({ statusCode: 503, statusMessage: 'Database unavailable' })
+  }
+  throw err
 }
