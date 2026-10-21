@@ -1,183 +1,55 @@
 <script setup lang="ts">
 import { gallery } from '~/data/gallery'
+import { fables } from '~/data/fables'
 
 definePageMeta({ pageTransition: { name: 'page', mode: 'out-in' } })
 
+/* ============ FABLE SELECTION (?fable=slug, shareable) ============ */
+const route = useRoute()
+const fable = computed(() => fables.find(f => f.slug === route.query.fable) ?? fables[0]!)
+const fableIndex = computed(() => fables.indexOf(fable.value))
+const prevFable = computed(() => fables[fableIndex.value - 1])
+const nextFable = computed(() => fables[fableIndex.value + 1])
+
 useSeoMeta({
-  title: 'Off the clock — Jules Besson',
-  description: 'La CI et la CD — a DevOps fable, annotated. Plus a few photos from off the clock.',
-  ogTitle: 'Off the clock — Jules Besson',
+  title: () => `${fable.value.title.join(' ')} — Jules Besson`,
+  description: 'Tech fables in the style of La Fontaine, annotated — plus a few photos from off the clock.',
+  ogTitle: () => `${fable.value.title.join(' ')} — Jules Besson`,
   ogType: 'article'
 })
 
-/* ============ POEM + ANNOTATIONS ============ */
-// Genius-style: a line with a `note` is highlighted; hovering / focusing / tapping it
-// shows that note. Lines sharing a note id highlight together.
-// \u00A0 = non-breaking space, keeps French punctuation (« » : ; ?) glued to its word.
+/* ============ ANNOTATIONS (shown only on click) ============ */
+const activeNote = ref<string | null>(null)
+const note = computed(() => (activeNote.value ? fable.value.notes[activeNote.value] : undefined))
+const colRef = ref<HTMLElement | null>(null)
+// vertical offset of the clicked line, so the desktop panel lines up with it (Genius-style)
+const panelOffset = ref(0)
 
-interface Line { text: string, note?: NoteId }
-
-const NOTES = {
-  intro: {
-    quote: 'La CI et la CD',
-    body: [
-      'Un pastiche de « La Cigale et la Fourmi » de La Fontaine, transposé dans le monde du développement : la CI (intégration continue) joue la fourmi prudente, la CD (déploiement continu) la cigale insouciante.',
-      'Survole un passage surligné pour lire son explication — ou touche-le sur mobile.'
-    ]
-  },
-  ci: {
-    quote: 'La CI, vive ouvrière',
-    body: [
-      'Comme la fourmi de La Fontaine, la CI est la travailleuse infatigable.',
-      'L’intégration continue, c’est le robot qui, à chaque modification envoyée sur le dépôt, récupère le code, l’installe et lance toutes les vérifications — GitHub Actions, GitLab CI, Jenkins…'
-    ]
-  },
-  matin: {
-    quote: 'Chaque matin vérifiait',
-    body: [
-      'Beaucoup d’équipes programment un « nightly build » : une compilation complète lancée chaque nuit ou chaque matin, en plus des vérifications déclenchées à chaque push.',
-      'Si quelque chose a cassé la veille, on le sait en arrivant.'
-    ]
-  },
-  compile: {
-    quote: 'Sans erreur se compilait',
-    body: [
-      'Première étape d’un pipeline : est-ce que ça compile ? Lint, vérification des types, build.',
-      'Si l’étape échoue, le pipeline passe au rouge et la fusion du code est bloquée — c’est tout l’intérêt.'
-    ]
-  },
-  cd: {
-    quote: 'La CD, plus aventureuse',
-    body: [
-      'La CD prend le relais : livrer automatiquement ce qui a passé la CI.',
-      'Nuance : en « Continuous Delivery », la version est prête et un humain appuie sur le bouton ; en « Continuous Deployment », elle part en production toute seule. Notre CD, « aventureuse », est clairement de la seconde école.'
-    ]
-  },
-  clients: {
-    quote: 'Chez les clients empressés',
-    body: [
-      'La pression du métier : utilisateurs et équipe produit veulent les nouveautés, vite.',
-      'C’est précisément cette impatience qui pousse à brûler les étapes.'
-    ]
-  },
-  paquets: {
-    quote: 'Tes paquets sont-ils bien sûrs ?',
-    body: [
-      'Les « paquets », ce sont les artefacts livrés et les dépendances qu’ils embarquent (npm, images Docker…).',
-      'Sont-ils sûrs ? Versions verrouillées, failles connues (npm audit), artefact construit depuis le bon commit… Une seule dépendance vérolée suffit à compromettre toute la chaîne.'
-    ]
-  },
-  test: {
-    quote: 'Un test manquant, une misère',
-    body: [
-      'Il suffit d’un seul chemin de code non testé pour qu’une régression passe entre les mailles.',
-      'Le succès d’un déploiement non vérifié dure souvent… jusqu’au premier utilisateur qui tombe sur le bug.'
-    ]
-  },
-  lanca: {
-    quote: 'Lança tout sans plus tarder',
-    body: [
-      'Déployer sans attendre la fin du pipeline, contourner les vérifications avec un « --no-verify », ou mettre en prod un vendredi à 18 h : le grand classique des histoires d’horreur de développeurs.'
-    ]
-  },
-  panne: {
-    quote: 'Le serveur perdit la face',
-    body: [
-      'La panne : erreurs 500, page blanche, base de données qui ne répond plus.',
-      'Dans le jargon, on « ouvre un incident » — et toute l’équipe lâche ce qu’elle faisait.'
-    ]
-  },
-  crier: {
-    quote: 'Les usagers, de crier',
-    body: [
-      'Tournure chère à La Fontaine : l’infinitif de narration. « Les usagers de crier » = les usagers se mirent à crier.',
-      'Côté technique : tickets au support, messages furieux sur les réseaux, et le téléphone d’astreinte qui sonne.'
-    ]
-  },
-  preuve: {
-    quote: 'Qui court sans preuve et sans lumière',
-    body: [
-      'La « preuve », ce sont les tests : ils démontrent que le code fait ce qu’on attend de lui.',
-      'La « lumière », c’est l’observabilité — logs, métriques, alertes — pour voir ce qui se passe réellement en production.',
-      'Le vers fait aussi écho au « Rien ne sert de courir » du Lièvre et la Tortue.'
-    ]
-  },
-  nuits: {
-    quote: 'Épargne bien des nuits blanches',
-    body: [
-      'Les nuits blanches, ce sont les astreintes : rollback à 3 h du matin, correctif en urgence (« hotfix »).',
-      'Écrire et lancer des tests coûte un peu de temps à chaque livraison, mais en fait gagner énormément le jour où ça casse.'
-    ]
-  },
-  planche: {
-    quote: 'Que déployer sur une planche',
-    body: [
-      '« Construire et vérifier » résume la CI : build, puis tests.',
-      'Déployer « sur une planche », c’est livrer sur une base bancale plutôt que sur des fondations solides — une planche pourrie, ou savonnée.'
-    ]
+function toggleNote (id: string, e: MouseEvent) {
+  if (activeNote.value === id) {
+    closeNote()
+    return
   }
-} satisfies Record<string, { quote: string, body: string[] }>
-
-type NoteId = keyof typeof NOTES
-
-const stanzas: Line[][] = [
-  [
-    { text: 'La CI, vive ouvrière,', note: 'ci' },
-    { text: 'Chaque matin vérifiait', note: 'matin' },
-    { text: 'Que le code, en bonne manière,', note: 'compile' },
-    { text: 'Sans erreur se compilait.', note: 'compile' }
-  ],
-  [
-    { text: 'La CD, plus aventureuse,', note: 'cd' },
-    { text: 'Promettait de déployer', note: 'cd' },
-    { text: 'La version, fière et joyeuse,' },
-    { text: 'Chez les clients empressés.', note: 'clients' }
-  ],
-  [
-    { text: '«\u00A0Attends\u00A0», disait la première,' },
-    { text: '«\u00A0Tes paquets sont-ils bien sûrs\u00A0?', note: 'paquets' },
-    { text: 'Un test manquant, une misère,', note: 'test' },
-    { text: 'Et tes succès seront courts.\u00A0»', note: 'test' }
-  ],
-  [
-    { text: 'Mais CD, pleine d’audace,' },
-    { text: 'Lança tout sans plus tarder\u00A0;', note: 'lanca' },
-    { text: 'Le serveur perdit la face,', note: 'panne' },
-    { text: 'Les usagers, de crier.', note: 'crier' }
-  ],
-  [
-    { text: 'Le soir, humble et moins légère,' },
-    { text: 'Elle revint vers sa sœur\u00A0:' },
-    { text: '«\u00A0Qui court sans preuve et sans lumière', note: 'preuve' },
-    { text: 'Met son produit en erreur.\u00A0»', note: 'preuve' }
-  ]
-]
-
-const moral: Line[] = [
-  { text: 'Qui teste avant de livrer', note: 'nuits' },
-  { text: 'Épargne bien des nuits blanches\u00A0;', note: 'nuits' },
-  { text: 'Mieux vaut construire et vérifier', note: 'planche' },
-  { text: 'Que déployer sur une planche.', note: 'planche' }
-]
-
-const ROMAN = ['I', 'II', 'III', 'IV', 'V']
-
-// null = nothing selected → the panel shows the intro note
-const activeNote = ref<NoteId | null>(null)
-const shownNote = computed(() => NOTES[activeNote.value ?? 'intro'])
-
-function showNote (id: NoteId) {
   activeNote.value = id
+  if (colRef.value) {
+    const lineTop = (e.currentTarget as HTMLElement).getBoundingClientRect().top
+    panelOffset.value = Math.max(0, lineTop - colRef.value.getBoundingClientRect().top)
+  }
 }
 
 function closeNote () {
   activeNote.value = null
 }
 
+watch(() => fable.value.slug, closeNote)
+
 function onKeydown (e: KeyboardEvent) {
-  // don't fight the photo lightbox, which handles Escape itself
+  // the photo lightbox handles Escape itself
   if (e.key === 'Escape' && activeNote.value && !dialogRef.value?.open) closeNote()
 }
+
+const pad = (n: number) => String(n).padStart(2, '0')
+const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII']
 
 /* ============ GALLERY + LIGHTBOX ============ */
 // In dev, empty photo slots are shown so you can see where pictures will go.
@@ -211,7 +83,6 @@ function onDialogClick (e: MouseEvent) {
   if (e.target === dialogRef.value) closePhoto()
 }
 
-const pad = (n: number) => String(n).padStart(2, '0')
 
 onMounted(() => document.addEventListener('keydown', onKeydown))
 onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
@@ -235,113 +106,167 @@ const year = new Date().getFullYear()
       <!-- ============ INTRO ============ -->
       <section class="intro" aria-labelledby="page-title">
         <p class="mono intro__kicker mask-line" style="--mask-delay: 0.1s">
-          <span>Off the clock</span>
+          <span>Jules Besson — after hours</span>
         </p>
-        <h1 id="page-title" class="intro__title" lang="fr">
-          <span class="mask-line" style="--mask-delay: 0.2s"><span>La CI</span></span>
-          <span class="mask-line intro__outline" style="--mask-delay: 0.35s"><span>et la CD</span></span>
+        <h1 id="page-title" class="intro__title">
+          <span class="mask-line" style="--mask-delay: 0.2s"><span>Off the</span></span>
+          <span class="mask-line intro__outline" style="--mask-delay: 0.35s"><span>clock.</span></span>
         </h1>
         <p class="intro__sub mask-line" style="--mask-delay: 0.55s">
-          <span>A DevOps fable in the style of La Fontaine — annotated, Genius-style.</span>
+          <span>Tech fables in the style of La Fontaine — pick one, then click any highlighted line to read the story behind it.</span>
         </p>
-        <!-- mobile only: on desktop this text lives in the annotation panel -->
-        <div class="intro__hint" lang="fr">
-          <p v-for="(paragraph, k) in NOTES.intro.body" :key="k">
-            {{ paragraph }}
-          </p>
-        </div>
       </section>
 
-      <!-- ============ POEM ============ -->
-      <article class="poem" lang="fr" aria-labelledby="page-title">
-        <div class="poem__body">
-          <div
-            v-for="(stanza, i) in stanzas"
-            :key="i"
-            v-reveal="80"
-            class="stanza"
-          >
-            <span class="stanza__num mono" aria-hidden="true">{{ ROMAN[i] }}.</span>
-            <p class="stanza__lines">
-              <template v-for="(line, j) in stanza" :key="j">
-                <button
-                  v-if="line.note"
-                  type="button"
-                  class="annot"
-                  :class="{ 'is-active': activeNote === line.note }"
-                  :aria-expanded="activeNote === line.note"
-                  aria-controls="annot-panel"
-                  @mouseenter="showNote(line.note)"
-                  @focus="showNote(line.note)"
-                  @click="showNote(line.note)"
-                >
-                  {{ line.text }}
-                </button>
-                <template v-else>
-                  {{ line.text }}
-                </template>
-                <br v-if="j < stanza.length - 1">
-              </template>
-            </p>
-          </div>
-
-          <aside v-reveal class="moral" aria-label="Moralité">
-            <p class="moral__label mono">
-              Moralité
-            </p>
-            <p class="moral__lines">
-              <template v-for="(line, j) in moral" :key="j">
-                <button
-                  v-if="line.note"
-                  type="button"
-                  class="annot annot--on-ink"
-                  :class="{ 'is-active': activeNote === line.note }"
-                  :aria-expanded="activeNote === line.note"
-                  aria-controls="annot-panel"
-                  @mouseenter="showNote(line.note)"
-                  @focus="showNote(line.note)"
-                  @click="showNote(line.note)"
-                >
-                  {{ line.text }}
-                </button>
-                <br v-if="j < moral.length - 1">
-              </template>
-            </p>
-          </aside>
+      <!-- ============ FABLES ============ -->
+      <section id="fable" class="fables" aria-labelledby="fables-title">
+        <div v-reveal class="section-head">
+          <span class="section-index">01</span>
+          <h2 id="fables-title" class="mono">
+            Fables
+          </h2>
+          <span class="section-count mono">({{ fables.length }})</span>
         </div>
 
-        <!-- annotation panel: sticky column on desktop, bottom sheet on mobile -->
-        <div class="annot-col">
-          <div
-            id="annot-panel"
-            class="annot-panel"
-            :class="{ 'has-note': activeNote }"
-            aria-live="polite"
-          >
-            <div class="annot-panel__top">
-              <span class="mono annot-panel__label">{{ activeNote ? 'Annotation' : 'À propos' }}</span>
-              <button
-                v-if="activeNote"
-                type="button"
-                class="mono annot-panel__close"
-                @click="closeNote"
+        <nav class="picker" aria-label="Choose a fable">
+          <ul class="picker__list">
+            <li v-for="(f, i) in fables" :key="f.slug" v-reveal="i * 70">
+              <NuxtLink
+                :to="{ query: { fable: f.slug } }"
+                replace
+                class="picker__item"
+                :class="{ 'is-active': f.slug === fable.slug }"
+                :aria-current="f.slug === fable.slug ? 'page' : undefined"
               >
-                Fermer <span aria-hidden="true">✕</span>
-              </button>
-            </div>
-            <Transition name="note" mode="out-in">
-              <div :key="activeNote ?? 'intro'" class="annot-panel__content">
-                <p class="annot-panel__quote">
-                  «&nbsp;{{ shownNote.quote }}&nbsp;»
-                </p>
-                <p v-for="(paragraph, k) in shownNote.body" :key="k" class="annot-panel__text">
-                  {{ paragraph }}
-                </p>
+                <span class="mono picker__num">{{ pad(i + 1) }}</span>
+                <span class="picker__title" lang="fr">{{ f.title.join(' ') }}</span>
+                <span class="mono picker__topic">{{ f.topic }}</span>
+              </NuxtLink>
+            </li>
+          </ul>
+        </nav>
+
+        <Transition name="fable" mode="out-in">
+          <article :key="fable.slug" class="fable" lang="fr" aria-labelledby="fable-title">
+            <header class="fable__head">
+              <p class="mono fable__kicker">
+                Fable {{ pad(fableIndex + 1) }} — d’après « {{ fable.original }} »
+              </p>
+              <h2 id="fable-title" class="fable__title">
+                <span>{{ fable.title[0] }}</span>
+                <span class="fable__outline">{{ fable.title[1] }}</span>
+              </h2>
+              <p class="fable__intro">
+                {{ fable.intro }}
+              </p>
+            </header>
+
+            <div class="poem">
+              <div class="poem__body">
+                <div
+                  v-for="(stanza, i) in fable.stanzas"
+                  :key="i"
+                  v-reveal="60"
+                  class="stanza"
+                >
+                  <span class="stanza__num mono" aria-hidden="true">{{ ROMAN[i] }}.</span>
+                  <p class="stanza__lines">
+                    <template v-for="(line, j) in stanza" :key="j">
+                      <button
+                        v-if="line.note"
+                        type="button"
+                        class="annot"
+                        :class="{ 'is-active': activeNote === line.note }"
+                        :aria-expanded="activeNote === line.note"
+                        aria-controls="annot-panel"
+                        @click="toggleNote(line.note, $event)"
+                      >
+                        {{ line.text }}
+                      </button>
+                      <template v-else>
+                        {{ line.text }}
+                      </template>
+                      <br v-if="j < stanza.length - 1">
+                    </template>
+                  </p>
+                </div>
+
+                <aside v-reveal class="moral" aria-label="Moralité">
+                  <p class="moral__label mono">
+                    Moralité
+                  </p>
+                  <p class="moral__lines">
+                    <template v-for="(line, j) in fable.moral" :key="j">
+                      <button
+                        v-if="line.note"
+                        type="button"
+                        class="annot annot--on-ink"
+                        :class="{ 'is-active': activeNote === line.note }"
+                        :aria-expanded="activeNote === line.note"
+                        aria-controls="annot-panel"
+                        @click="toggleNote(line.note, $event)"
+                      >
+                        {{ line.text }}
+                      </button>
+                      <template v-else>
+                        {{ line.text }}
+                      </template>
+                      <br v-if="j < fable.moral.length - 1">
+                    </template>
+                  </p>
+                </aside>
               </div>
-            </Transition>
-          </div>
-        </div>
-      </article>
+
+              <!-- annotation: lines up with the clicked line on desktop, bottom sheet on mobile -->
+              <div ref="colRef" class="annot-col">
+                <div
+                  id="annot-panel"
+                  class="annot-anchor"
+                  :style="{ '--offset': `${panelOffset}px` }"
+                  aria-live="polite"
+                >
+                  <Transition name="panel" mode="out-in">
+                    <div v-if="note" :key="activeNote ?? ''" class="annot-panel">
+                      <div class="annot-panel__top">
+                        <span class="mono annot-panel__label">Annotation</span>
+                        <button type="button" class="mono annot-panel__close" @click="closeNote">
+                          Fermer <span aria-hidden="true">✕</span>
+                        </button>
+                      </div>
+                      <p class="annot-panel__quote">
+                        «&nbsp;{{ note.quote }}&nbsp;»
+                      </p>
+                      <p v-for="(paragraph, k) in note.body" :key="k" class="annot-panel__text">
+                        {{ paragraph }}
+                      </p>
+                    </div>
+                  </Transition>
+                </div>
+              </div>
+            </div>
+
+            <nav class="pager" aria-label="Other fables">
+              <NuxtLink
+                v-if="prevFable"
+                :to="{ query: { fable: prevFable.slug }, hash: '#fable' }"
+                replace
+                class="pager__link"
+              >
+                <span class="mono pager__dir">← Fable précédente</span>
+                <span class="pager__title">{{ prevFable.title.join(' ') }}</span>
+              </NuxtLink>
+              <NuxtLink
+                v-if="nextFable"
+                :to="{ query: { fable: nextFable.slug }, hash: '#fable' }"
+                replace
+                class="pager__link pager__link--next"
+              >
+                <span class="mono pager__dir">Fable suivante →</span>
+                <span class="pager__title">{{ nextFable.title.join(' ') }}</span>
+              </NuxtLink>
+            </nav>
+          </article>
+        </Transition>
+      </section>
 
       <!-- ============ GALLERY ============ -->
       <section v-if="gallery.length || showPlaceholders" class="gallery" aria-labelledby="gallery-title">
@@ -453,7 +378,6 @@ main:focus {
 }
 
 .header__back {
-  position: relative;
   padding: 0.2rem 0;
   margin-right: auto;
   margin-left: clamp(1rem, 4vw, 3rem);
@@ -471,7 +395,6 @@ main:focus {
   flex-direction: column;
   gap: clamp(1.5rem, 4vh, 2.5rem);
   padding: clamp(3rem, 10vh, 7rem) var(--gutter) clamp(2.5rem, 7vh, 5rem);
-  border-bottom: 1px solid var(--line);
 }
 
 .intro__kicker {
@@ -491,21 +414,131 @@ main:focus {
   -webkit-text-stroke: 2px var(--ink);
 }
 
-.intro__hint {
-  display: none;
-  flex-direction: column;
-  gap: 0.6rem;
-  max-width: 50ch;
-  padding-left: 1rem;
-  border-left: 4px solid var(--ink);
-  color: var(--grey-dark);
-}
-
 .intro__sub {
-  max-width: 36ch;
+  max-width: 44ch;
   font-size: clamp(1rem, 1.6vw, 1.35rem);
   line-height: 1.45;
   color: var(--grey-dark);
+}
+
+/* ============ PICKER ============ */
+.picker__list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  border-top: 1px solid var(--line-soft);
+}
+
+.picker__list li + li .picker__item {
+  border-left: 1px solid var(--line-soft);
+}
+
+.picker__item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  height: 100%;
+  padding: 1.4rem var(--gutter) 1.6rem;
+  transition:
+    background 0.3s var(--ease-out),
+    color 0.3s var(--ease-out);
+}
+
+/* active bar grows in from the left */
+.picker__item::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--ink);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.45s var(--ease-out);
+}
+
+.picker__item:hover {
+  background: var(--bg-soft);
+}
+
+.picker__item.is-active::after {
+  transform: scaleX(1);
+}
+
+.picker__item:focus-visible {
+  outline-offset: -4px;
+}
+
+.picker__num,
+.picker__topic {
+  color: var(--grey);
+}
+
+.picker__title {
+  font-size: clamp(1.1rem, 1.6vw, 1.35rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.picker__item.is-active .picker__num {
+  color: var(--ink);
+}
+
+/* ============ FABLE ============ */
+.fable {
+  border-top: 1px solid var(--line);
+}
+
+.fable__head {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: clamp(2.5rem, 7vh, 5rem) var(--gutter) 0;
+}
+
+.fable__kicker {
+  color: var(--grey);
+}
+
+.fable__title {
+  display: flex;
+  flex-direction: column;
+  font-size: clamp(2.6rem, 8vw, 7rem);
+  line-height: 0.95;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+}
+
+.fable__outline {
+  color: transparent;
+  -webkit-text-stroke: 2px var(--ink);
+}
+
+.fable__intro {
+  max-width: 52ch;
+  font-size: clamp(1rem, 1.4vw, 1.2rem);
+  line-height: 1.5;
+  color: var(--grey-dark);
+}
+
+.fable-enter-active,
+.fable-leave-active {
+  transition:
+    opacity 0.3s var(--ease-out),
+    transform 0.3s var(--ease-out);
+}
+
+.fable-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.fable-leave-to {
+  opacity: 0;
 }
 
 /* ============ POEM ============ */
@@ -513,7 +546,7 @@ main:focus {
   display: grid;
   grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
   gap: clamp(2rem, 6vw, 6rem);
-  padding: clamp(2.5rem, 7vh, 5rem) var(--gutter) clamp(3rem, 8vh, 6rem);
+  padding: clamp(2rem, 6vh, 4rem) var(--gutter) clamp(2.5rem, 7vh, 4rem);
 }
 
 .stanza {
@@ -535,27 +568,28 @@ main:focus {
 }
 
 .stanza__lines {
-  font-size: clamp(1.2rem, 2vw, 1.6rem);
+  font-size: clamp(1.15rem, 1.9vw, 1.55rem);
   line-height: 1.6;
   letter-spacing: -0.01em;
 }
 
-/* ---- annotated fragments (Genius-style highlight) ---- */
+/* ---- clickable annotated lines (Genius-style highlight) ---- */
 .annot {
   display: inline;
   text-align: left;
   padding: 0 0.15em;
   margin: 0 -0.15em;
   background: color-mix(in srgb, var(--ink) 9%, transparent);
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
-  cursor: help;
+  cursor: pointer;
   transition:
     background 0.25s var(--ease-out),
     color 0.25s var(--ease-out);
 }
 
-.annot:hover,
+.annot:hover {
+  background: color-mix(in srgb, var(--ink) 18%, transparent);
+}
+
 .annot.is-active {
   background: var(--ink);
   color: var(--bg);
@@ -565,7 +599,10 @@ main:focus {
   background: color-mix(in srgb, var(--bg) 16%, transparent);
 }
 
-.annot--on-ink:hover,
+.annot--on-ink:hover {
+  background: color-mix(in srgb, var(--bg) 28%, transparent);
+}
+
 .annot--on-ink.is-active {
   background: var(--bg);
   color: var(--ink);
@@ -591,8 +628,8 @@ main:focus {
 }
 
 .moral__lines {
-  font-size: clamp(1.4rem, 2.6vw, 2.2rem);
-  line-height: 1.4;
+  font-size: clamp(1.3rem, 2.4vw, 2rem);
+  line-height: 1.45;
   font-weight: 500;
   letter-spacing: -0.02em;
 }
@@ -615,13 +652,19 @@ main:focus {
   position: relative;
 }
 
-.annot-panel {
+/* sits level with the clicked line, then sticks while scrolling */
+.annot-anchor {
   position: sticky;
-  top: calc(var(--header-h) + 2rem);
+  top: calc(var(--header-h) + 1.5rem);
+  margin-top: var(--offset, 0);
+  transition: margin-top 0.45s var(--ease-out);
+}
+
+.annot-panel {
   display: flex;
   flex-direction: column;
-  gap: 1.25rem;
-  padding: clamp(1.5rem, 3vw, 2.25rem);
+  gap: 0.9rem;
+  padding: clamp(1.4rem, 2.5vw, 2rem);
   border: 1px solid var(--line);
   border-left-width: 4px;
   background: var(--bg);
@@ -632,7 +675,6 @@ main:focus {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  min-height: 2rem;
 }
 
 .annot-panel__label {
@@ -654,14 +696,8 @@ main:focus {
   color: var(--bg);
 }
 
-.annot-panel__content {
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-}
-
 .annot-panel__quote {
-  font-size: clamp(1.15rem, 1.8vw, 1.45rem);
+  font-size: clamp(1.1rem, 1.6vw, 1.35rem);
   font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 1.3;
@@ -672,20 +708,67 @@ main:focus {
   line-height: 1.6;
 }
 
-.note-enter-active,
-.note-leave-active {
+.panel-enter-active,
+.panel-leave-active {
   transition:
-    opacity 0.2s var(--ease-out),
-    transform 0.2s var(--ease-out);
+    opacity 0.25s var(--ease-out),
+    transform 0.25s var(--ease-out);
 }
 
-.note-enter-from {
+.panel-enter-from {
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateX(16px);
 }
 
-.note-leave-to {
+.panel-leave-to {
   opacity: 0;
+}
+
+/* ============ PAGER ============ */
+.pager {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 1px solid var(--line-soft);
+}
+
+.pager__link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.6rem var(--gutter);
+  transition:
+    background 0.3s var(--ease-out),
+    color 0.3s var(--ease-out);
+}
+
+.pager__link--next {
+  grid-column: 2;
+  align-items: flex-end;
+  text-align: right;
+  border-left: 1px solid var(--line-soft);
+}
+
+.pager__link:hover {
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.pager__dir {
+  color: var(--grey);
+}
+
+.pager__link:hover .pager__dir {
+  color: var(--on-ink-muted);
+}
+
+.pager__title {
+  font-size: clamp(1.1rem, 1.8vw, 1.5rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.pager__link:focus-visible {
+  outline-offset: -4px;
 }
 
 /* ============ GALLERY ============ */
@@ -886,10 +969,14 @@ main:focus {
   }
 
   .annot,
+  .annot-anchor,
+  .picker__item::after,
   .gallery__btn img,
   .gallery__caption,
-  .note-enter-active,
-  .note-leave-active {
+  .fable-enter-active,
+  .fable-leave-active,
+  .panel-enter-active,
+  .panel-leave-active {
     transition: none;
   }
 
@@ -899,8 +986,7 @@ main:focus {
   }
 
   .lightbox[open],
-  .lightbox__img,
-  .annot-panel.has-note {
+  .lightbox__img {
     animation: none;
   }
 }
@@ -915,32 +1001,60 @@ main:focus {
     grid-template-columns: 2.25rem minmax(0, 1fr);
   }
 
-  .intro__hint {
-    display: flex;
+  .picker__list li + li .picker__item {
+    border-left: none;
+    border-top: 1px solid var(--line-soft);
   }
 
-  /* no side column on mobile: the panel only appears, as a bottom sheet,
-     once a passage is tapped — out of the flow so the poem never jumps */
-  .annot-panel {
-    display: none;
+  .picker__item {
+    flex-direction: row;
+    align-items: baseline;
+    gap: 1rem;
+    padding: 1rem var(--gutter);
   }
 
-  .annot-panel.has-note {
-    display: flex;
+  .picker__topic {
+    margin-left: auto;
+  }
+
+  /* the opened annotation becomes a bottom sheet, out of the flow so the poem never jumps */
+  .annot-col {
+    display: contents;
+  }
+
+  .annot-anchor {
     position: fixed;
     inset: auto 0 0;
     z-index: 30;
+    margin-top: 0;
+  }
+
+  .annot-panel {
     max-height: 65svh;
     overflow-y: auto;
     border-width: 4px 0 0;
     box-shadow: 0 -12px 40px rgb(0 0 0 / 0.18);
-    animation: sheet-up 0.35s var(--ease-out);
   }
 
-  @keyframes sheet-up {
-    from {
-      transform: translateY(100%);
-    }
+  .panel-enter-from,
+  .panel-leave-to {
+    opacity: 1;
+    transform: translateY(100%);
+  }
+
+  .panel-enter-active,
+  .panel-leave-active {
+    transition: transform 0.35s var(--ease-out);
+  }
+
+  .pager {
+    grid-template-columns: 1fr;
+  }
+
+  .pager__link--next {
+    grid-column: 1;
+    border-left: none;
+    border-top: 1px solid var(--line-soft);
   }
 }
 
