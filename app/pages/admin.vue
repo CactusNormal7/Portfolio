@@ -143,6 +143,120 @@ async function deleteProject (project: Project) {
   }
 }
 
+/* ---------- github import ---------- */
+interface RepoDraft {
+  fullName: string
+  title: string
+  description: string
+  tags: string
+  year: string
+  link: string
+  repoUrl: string
+  image: string
+  stars: number
+  fork: boolean
+  archived: boolean
+  pushedAt: string
+}
+
+const repoUrl = ref('')
+const fetchingRepo = ref(false)
+const githubMessage = ref('')
+
+const repos = ref<RepoDraft[]>([])
+const loadingRepos = ref(false)
+const showForks = ref(false)
+const selectedRepos = ref<string[]>([])
+const importing = ref(false)
+
+// a repo counts as imported when a project already points at it or at its live site
+const importedLinks = computed(() => new Set((projects.value ?? []).map(p => p.link.replace(/\/+$/, ''))))
+function isImported (repo: RepoDraft): boolean {
+  return importedLinks.value.has(repo.link.replace(/\/+$/, '')) || importedLinks.value.has(repo.repoUrl)
+}
+
+const visibleRepos = computed(() => repos.value.filter(r => showForks.value || !r.fork))
+const selectableRepos = computed(() => visibleRepos.value.filter(r => !isImported(r)))
+
+function draftToBody (draft: RepoDraft) {
+  return {
+    title: draft.title,
+    description: draft.description,
+    tags: draft.tags,
+    year: draft.year,
+    link: draft.link,
+    image: draft.image,
+    position: 0
+  }
+}
+
+function fillFormFromRepo (draft: RepoDraft) {
+  resetForm()
+  Object.assign(form, draftToBody(draft))
+  formMessage.value = `Prefilled from ${draft.fullName} — review and save.`
+  document.getElementById('p-title')?.focus({ preventScroll: true })
+  document.getElementById('project-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+async function fetchRepoFromUrl () {
+  if (fetchingRepo.value || !repoUrl.value.trim()) return
+  fetchingRepo.value = true
+  githubMessage.value = ''
+  try {
+    const draft = await $fetch<RepoDraft>('/api/github/repo', { query: { url: repoUrl.value } })
+    fillFormFromRepo(draft)
+    repoUrl.value = ''
+  } catch (err: unknown) {
+    githubMessage.value = errorMessage(err, 'Could not fetch this repository.')
+  } finally {
+    fetchingRepo.value = false
+  }
+}
+
+async function loadRepos () {
+  loadingRepos.value = true
+  githubMessage.value = ''
+  try {
+    repos.value = await $fetch<RepoDraft[]>('/api/github/repos')
+    selectedRepos.value = []
+  } catch (err: unknown) {
+    githubMessage.value = errorMessage(err, 'Could not load repositories.')
+  } finally {
+    loadingRepos.value = false
+  }
+}
+
+function toggleSelectAll () {
+  selectedRepos.value = selectedRepos.value.length === selectableRepos.value.length
+    ? []
+    : selectableRepos.value.map(r => r.fullName)
+}
+
+async function importRepos (drafts: RepoDraft[]) {
+  if (importing.value || !drafts.length) return
+  importing.value = true
+  githubMessage.value = ''
+  let done = 0
+  try {
+    for (const draft of drafts) {
+      await $fetch('/api/projects', { method: 'POST', body: draftToBody(draft) })
+      done++
+    }
+    githubMessage.value = `Imported ${done} project${done > 1 ? 's' : ''}.`
+  } catch (err: unknown) {
+    githubMessage.value = `${errorMessage(err, 'Import failed.')} (${done}/${drafts.length} imported)`
+  } finally {
+    selectedRepos.value = []
+    importing.value = false
+    await refreshProjects()
+  }
+}
+
+function importSelected () {
+  const selected = new Set(selectedRepos.value)
+  importRepos(visibleRepos.value.filter(r => selected.has(r.fullName)))
+}
+
 async function deleteMessage (message: Message) {
   if (!window.confirm(`Delete message from ${message.name}? This can't be undone.`)) return
   actionError.value = ''
@@ -194,7 +308,66 @@ async function deleteMessage (message: Message) {
 
       <!-- ---------- PROJECTS TAB ---------- -->
       <section v-if="tab === 'projects'" class="admin__body">
-        <form class="panel" @submit.prevent="saveProject">
+        <div class="panel">
+          <h2 class="panel__title mono">Import from GitHub</h2>
+          <form class="github__paste" @submit.prevent="fetchRepoFromUrl">
+            <div class="field">
+              <label for="gh-url">Paste a repository link</label>
+              <input id="gh-url" v-model="repoUrl" type="text" placeholder="https://github.com/owner/repo" required>
+            </div>
+            <button class="btn" type="submit" :disabled="fetchingRepo">{{ fetchingRepo ? 'Fetching…' : 'Prefill form' }}</button>
+          </form>
+
+          <div class="panel__actions">
+            <button class="btn btn--ghost" type="button" :disabled="loadingRepos" @click="loadRepos">
+              {{ loadingRepos ? 'Loading…' : repos.length ? 'Reload my repositories' : 'Load my GitHub repositories' }}
+            </button>
+            <template v-if="repos.length">
+              <label class="mono github__check">
+                <input v-model="showForks" type="checkbox"> Show forks
+              </label>
+              <button class="mono row__btn" type="button" :disabled="!selectableRepos.length" @click="toggleSelectAll">
+                {{ selectedRepos.length && selectedRepos.length === selectableRepos.length ? 'Unselect all' : 'Select all' }}
+              </button>
+              <button class="btn" type="button" :disabled="importing || !selectedRepos.length" @click="importSelected">
+                {{ importing ? 'Importing…' : `Import selected (${selectedRepos.length})` }}
+              </button>
+            </template>
+            <span v-if="githubMessage" class="mono panel__feedback" role="status">{{ githubMessage }}</span>
+          </div>
+
+          <ul v-if="visibleRepos.length" class="rows github__list">
+            <li v-for="repo in visibleRepos" :key="repo.fullName" class="row" :class="{ 'row--done': isImported(repo) }">
+              <input
+                v-model="selectedRepos"
+                type="checkbox"
+                class="github__select"
+                :value="repo.fullName"
+                :disabled="isImported(repo)"
+                :aria-label="`Select ${repo.fullName}`"
+              >
+              <div class="row__main">
+                <strong class="row__title">
+                  {{ repo.title }}
+                  <span v-if="isImported(repo)" class="mono github__badge">Imported</span>
+                  <span v-if="repo.fork" class="mono github__badge">Fork</span>
+                  <span v-if="repo.archived" class="mono github__badge">Archived</span>
+                </strong>
+                <span class="mono row__sub">
+                  <a :href="repo.repoUrl" target="_blank" rel="noopener noreferrer">{{ repo.fullName }}</a>
+                  — {{ repo.year }} — {{ repo.tags || 'no tags' }} — ★ {{ repo.stars }}
+                </span>
+                <p v-if="repo.description" class="row__body">{{ repo.description }}</p>
+              </div>
+              <div class="row__actions">
+                <button type="button" class="mono row__btn" :aria-label="`Edit ${repo.fullName} before importing`" @click="fillFormFromRepo(repo)">Edit first</button>
+                <button type="button" class="mono row__btn" :disabled="importing || isImported(repo)" :aria-label="`Import ${repo.fullName}`" @click="importRepos([repo])">Import</button>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <form id="project-form" class="panel" @submit.prevent="saveProject">
           <h2 class="panel__title mono">{{ editingId ? `Edit project #${editingId}` : 'New project' }}</h2>
           <div class="panel__grid">
             <div class="field">
@@ -515,6 +688,54 @@ async function deleteMessage (message: Message) {
   color: var(--grey);
 }
 
+/* ---------- github import ---------- */
+.github__paste {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+}
+
+.github__paste .field {
+  flex: 1;
+}
+
+.github__check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.github__list {
+  max-height: 32rem;
+  overflow-y: auto;
+}
+
+.github__select {
+  margin-top: 0.35rem;
+  accent-color: var(--ink);
+}
+
+.github__badge {
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.45rem;
+  border: 1px solid var(--line-soft);
+  color: var(--grey-dark);
+  font-size: 0.65rem;
+  font-weight: 400;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.row--done {
+  opacity: 0.55;
+}
+
+.row__btn:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
 @media (max-width: 700px) {
   .panel__grid {
     grid-template-columns: 1fr;
@@ -522,6 +743,11 @@ async function deleteMessage (message: Message) {
 
   .row {
     flex-wrap: wrap;
+  }
+
+  .github__paste {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 </style>
