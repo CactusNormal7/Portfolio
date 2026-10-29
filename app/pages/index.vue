@@ -78,6 +78,7 @@ const hoveredProject = ref<number | null>(null);
 const previewRef = ref<HTMLElement | null>(null);
 // the frame takes each image's own shape so nothing gets cropped; projects
 // without an image get a typographic card at the default 4:3
+const hasProjects = computed(() => Boolean(projects.value?.length));
 const imageRatios = reactive<Record<number, number>>({});
 const previewRatio = computed(
   () => (hoveredProject.value !== null && imageRatios[hoveredProject.value]) || 4 / 3,
@@ -156,12 +157,12 @@ onMounted(() => {
 });
 
 // projects may arrive after mount (lazy fetch), so start the loop when they do
-watch(hasImages, startPreviewLoop);
+watch(hasProjects, startPreviewLoop);
 
 function startPreviewLoop() {
   if (
     !rafId &&
-    hasImages.value &&
+    hasProjects.value &&
     matchMedia("(hover: hover) and (pointer: fine)").matches &&
     !matchMedia("(prefers-reduced-motion: reduce)").matches
   ) {
@@ -390,7 +391,7 @@ const year = new Date().getFullYear();
 
         <!-- floating preview, desktop pointers only (see CSS) -->
         <div
-          v-if="projects?.length"
+          v-if="hasProjects"
           ref="previewRef"
           class="preview"
           :class="{ 'is-visible': hoveredProject !== null }"
@@ -1010,15 +1011,16 @@ main:focus {
   justify-content: space-between;
   gap: 1rem;
   padding: 1.25rem;
-  background: var(--ink);
-  color: var(--bg);
+  /* the hovered row turns ink, so the card stays on the page colours */
+  background: var(--bg);
+  color: var(--ink);
 }
 
 .preview__card-meta {
   display: flex;
   justify-content: space-between;
   font-size: 0.75rem;
-  color: var(--on-ink-muted);
+  color: var(--grey);
 }
 
 .preview__card-title {
@@ -1037,7 +1039,7 @@ main:focus {
 
 .preview__card-tags {
   font-size: 0.7rem;
-  color: var(--on-ink-muted);
+  color: var(--grey);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
