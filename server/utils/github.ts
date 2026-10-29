@@ -73,7 +73,8 @@ function toDraft (repo: GithubRepo): RepoDraft {
     // prefer the live site when the repo declares one
     link: repo.homepage?.trim() || repo.html_url,
     repoUrl: repo.html_url,
-    image: `https://opengraph.githubassets.com/1/${repo.full_name}`,
+    // GitHub's auto-generated card is left out: the site draws its own fallback
+    image: '',
     stars: repo.stargazers_count,
     fork: repo.fork,
     archived: repo.archived,
@@ -88,8 +89,30 @@ export function parseRepoUrl (input: string): { owner: string, repo: string } | 
   return match ? { owner: match[1]!, repo: match[2]! } : null
 }
 
+// opengraph.githubassets.com serves the generic card GitHub builds for every repo
+export function isGenericRepoCard (url: string): boolean {
+  return /^https?:\/\/opengraph\.githubassets\.com\//.test(url)
+}
+
+// The REST API doesn't expose a repo's custom social preview, so read the og:image
+// of its page; only keep it when it's an uploaded one, not the generic card
+async function fetchSocialPreview (fullName: string): Promise<string> {
+  try {
+    const html = await ofetch<string>(`https://github.com/${fullName}`, {
+      responseType: 'text',
+      headers: { 'User-Agent': 'portfolio-backoffice' }
+    })
+    const url = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/)?.[1] ?? ''
+    return url && !isGenericRepoCard(url) ? url.replace(/&amp;/g, '&') : ''
+  } catch {
+    return ''
+  }
+}
+
 export async function fetchRepo (owner: string, repo: string): Promise<RepoDraft> {
-  return toDraft(await githubFetch<GithubRepo>(`/repos/${owner}/${repo}`))
+  const draft = toDraft(await githubFetch<GithubRepo>(`/repos/${owner}/${repo}`))
+  draft.image = await fetchSocialPreview(draft.fullName)
+  return draft
 }
 
 export async function fetchUserRepos (user: string): Promise<RepoDraft[]> {

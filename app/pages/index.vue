@@ -76,7 +76,22 @@ const activeSection = ref<(typeof sections)[number] | null>(null);
 /* ---------- project image preview (follows the cursor) ---------- */
 const hoveredProject = ref<number | null>(null);
 const previewRef = ref<HTMLElement | null>(null);
-const hasImages = computed(() => projects.value?.some((p) => p.image) ?? false);
+// the frame takes each image's own shape so nothing gets cropped; projects
+// without an image get a typographic card at the default 4:3
+const imageRatios = reactive<Record<number, number>>({});
+const previewRatio = computed(
+  () => (hoveredProject.value !== null && imageRatios[hoveredProject.value]) || 4 / 3,
+);
+
+function onPreviewLoad(project: Project, e: Event) {
+  const img = e.target as HTMLImageElement;
+  if (!img.naturalWidth || !img.naturalHeight) return;
+  // keep extreme shapes (banners, phone screenshots) within a sane frame
+  imageRatios[project.id] = Math.min(
+    Math.max(img.naturalWidth / img.naturalHeight, 3 / 4),
+    2,
+  );
+}
 const target = { x: 0, y: 0 };
 const current = { x: 0, y: 0 };
 let rafId = 0;
@@ -107,7 +122,6 @@ function onProjectMove(e: MouseEvent) {
 }
 
 function onProjectEnter(project: Project, e: MouseEvent) {
-  if (!project.image) return;
   // jump straight to the cursor when nothing was showing, then follow it
   if (hoveredProject.value === null) {
     current.x = target.x = e.clientX;
@@ -376,14 +390,14 @@ const year = new Date().getFullYear();
 
         <!-- floating preview, desktop pointers only (see CSS) -->
         <div
-          v-if="hasImages"
+          v-if="projects?.length"
           ref="previewRef"
           class="preview"
           :class="{ 'is-visible': hoveredProject !== null }"
           aria-hidden="true"
         >
-          <div class="preview__frame">
-            <template v-for="project in projects" :key="project.id">
+          <div class="preview__frame" :style="{ aspectRatio: previewRatio }">
+            <template v-for="(project, i) in projects" :key="project.id">
               <img
                 v-if="project.image"
                 :src="project.image"
@@ -391,7 +405,22 @@ const year = new Date().getFullYear();
                 class="preview__img"
                 :class="{ 'is-active': hoveredProject === project.id }"
                 decoding="async"
+                @load="onPreviewLoad(project, $event)"
               />
+              <div
+                v-else
+                class="preview__card"
+                :class="{ 'is-active': hoveredProject === project.id }"
+              >
+                <span class="preview__card-meta mono">
+                  <span>{{ String(i + 1).padStart(2, "0") }}</span>
+                  <span>{{ project.year }}</span>
+                </span>
+                <span class="preview__card-title">{{ project.title }}</span>
+                <span v-if="project.tags.length" class="preview__card-tags mono">
+                  {{ project.tags.slice(0, 4).join(" / ") }}
+                </span>
+              </div>
             </template>
           </div>
         </div>
@@ -942,19 +971,21 @@ main:focus {
   border: 1px solid var(--line);
   background: var(--bg-soft);
   clip-path: inset(50% 50% 50% 50%);
-  transition: clip-path 0.5s var(--ease-out);
+  transition:
+    clip-path 0.5s var(--ease-out),
+    aspect-ratio 0.5s var(--ease-out);
 }
 
 .preview.is-visible .preview__frame {
   clip-path: inset(0 0 0 0);
 }
 
-.preview__img {
+.preview__img,
+.preview__card {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
   opacity: 0;
   scale: 1.12;
   transition:
@@ -962,9 +993,54 @@ main:focus {
     scale 0.7s var(--ease-out);
 }
 
-.preview__img.is-active {
+.preview__img {
+  object-fit: cover;
+}
+
+.preview__img.is-active,
+.preview__card.is-active {
   opacity: 1;
   scale: 1;
+}
+
+/* fallback for projects without an image */
+.preview__card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: var(--ink);
+  color: var(--bg);
+}
+
+.preview__card-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--on-ink-muted);
+}
+
+.preview__card-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  font-size: clamp(1.5rem, 2.4vw, 2.25rem);
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.preview__card-tags {
+  font-size: 0.7rem;
+  color: var(--on-ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 @media (hover: none), (pointer: coarse) {
@@ -1139,7 +1215,8 @@ main:focus {
   }
   .project__title,
   .preview__frame,
-  .preview__img {
+  .preview__img,
+  .preview__card {
     transition: none;
   }
   .project:hover .project__title {
